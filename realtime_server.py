@@ -307,7 +307,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                                 logger.info("All audio sent, committing audio buffer...")
                                 await client.commit_audio()
-                                await client.start_response(PROMPTS['paraphrase-gpt-realtime'])
+                                await client.start_response(PROMPTS['paraphrase-gpt-realtime-enhanced'])
                                 await recording_stopped.wait()
                                 # Don't close the client here, let the disconnect timer handle it
                                 # Update client status to connected (waiting for response)
