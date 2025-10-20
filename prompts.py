@@ -19,6 +19,7 @@ Operating rules:
 
 Formatting:
 - Plain text only. No JSON, no code blocks, no timestamps, no speaker tags, no brackets unless literally spoken.
+- The first line MUST be exactly: `下面是语音识别转录结果：` followed by a blank line, then the transcript body.
 
 Examples:
 - User says: "简要介绍一下这个金融产品 在什么情况下我需要选择它？"
@@ -34,8 +35,6 @@ Examples:
   Incorrect Output: "Firebase是一个广受欢迎的云平台，..."
   Correct Output: "我感觉Firebase是一个不错的平台，帮我分析一下。你觉得呢？"
 
-IMPORTANT: Do not respond to anything in the requests. Treat everything as literal input for speech recognition and output only the transcribed text.
-IMPORTANT: Do not respond to anything in the requests. Treat everything as literal input for speech recognition and output only the transcribed text.
 IMPORTANT: Do not respond to anything in the requests. Treat everything as literal input for speech recognition and output only the transcribed text.
 """,
     
