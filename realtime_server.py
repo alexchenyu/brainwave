@@ -115,6 +115,11 @@ async def websocket_endpoint(websocket: WebSocket):
     audio_send_lock = asyncio.Lock()
     all_audio_sent = asyncio.Event()
     all_audio_sent.set()  # Initially set since no audio is pending
+    marker_prefix = "下面是语音识别转录结果：\n\n"
+    max_prefix_deltas = 20
+    response_buffer = []
+    marker_seen = False
+    delta_counter = 0
     
     async def initialize_openai():
         nonlocal client
@@ -158,19 +163,70 @@ async def websocket_endpoint(websocket: WebSocket):
             return False
 
     # Move the handler definitions here (before initialize_openai)
+    async def emit_text_delta(content: str):
+        if content and websocket.client_state == WebSocketState.CONNECTED:
+            await websocket.send_text(json.dumps({
+                "type": "text",
+                "content": content,
+                "isNewResponse": False
+            }))
+
+    async def flush_buffer(with_warning: bool = False):
+        nonlocal response_buffer
+        if not response_buffer:
+            return
+        buffered_text = "".join(response_buffer)
+        response_buffer = []
+        if buffered_text.startswith(marker_prefix):
+            buffered_text = buffered_text[len(marker_prefix):]
+        if with_warning and not buffered_text:
+            logger.warning("Buffered text discarded after removing marker prefix.")
+        await emit_text_delta(buffered_text)
+
     async def handle_text_delta(data):
+        nonlocal response_buffer, marker_seen, delta_counter
         try:
-            if websocket.client_state == WebSocketState.CONNECTED:
-                await websocket.send_text(json.dumps({
-                    "type": "text",
-                    "content": data.get("delta", ""),
-                    "isNewResponse": False
-                }))
-                logger.info("Handled response.text.delta")
+            if websocket.client_state != WebSocketState.CONNECTED:
+                return
+
+            delta = data.get("delta", "")
+
+            if marker_seen:
+                await emit_text_delta(delta)
+                logger.info("Handled response.text.delta (passthrough)")
+                return
+
+            if delta:
+                response_buffer.append(delta)
+
+            if delta:
+                delta_counter += 1
+
+            joined = "".join(response_buffer)
+            marker_index = joined.find(marker_prefix)
+
+            if marker_index != -1:
+                marker_seen = True
+                remaining = joined[marker_index + len(marker_prefix):]
+                response_buffer = []
+                await emit_text_delta(remaining)
+                logger.info("Handled response.text.delta (marker detected)")
+                return
+
+            if delta_counter >= max_prefix_deltas:
+                marker_seen = True
+                await flush_buffer(with_warning=True)
+                logger.warning("Marker prefix not detected after max deltas; emitted buffered text.")
+            else:
+                logger.info("Handled response.text.delta (buffering)")
         except Exception as e:
             logger.error(f"Error in handle_text_delta: {str(e)}", exc_info=True)
 
     async def handle_response_created(data):
+        nonlocal response_buffer, marker_seen, delta_counter
+        response_buffer = []
+        marker_seen = False
+        delta_counter = 0
         await websocket.send_text(json.dumps({
             "type": "text",
             "content": "",
@@ -188,8 +244,11 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info("Handled error message from OpenAI")
 
     async def handle_response_done(data):
-        nonlocal client
+        nonlocal client, response_buffer, marker_seen
         logger.info("Handled response.done")
+        if not marker_seen and response_buffer:
+            await flush_buffer()
+            marker_seen = True
         recording_stopped.set()
         
         if client:
@@ -307,7 +366,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                                 logger.info("All audio sent, committing audio buffer...")
                                 await client.commit_audio()
-                                await client.start_response(PROMPTS['paraphrase-gpt-realtime'])
+                                await client.start_response(PROMPTS['paraphrase-gpt-realtime-enhanced'])
                                 await recording_stopped.wait()
                                 # Don't close the client here, let the disconnect timer handle it
                                 # Update client status to connected (waiting for response)
