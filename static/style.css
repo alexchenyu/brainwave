@@ -281,9 +281,43 @@ body.dark-theme .copy-button {
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     width: 90%;
     max-width: 500px;
-    max-height: 80vh;
+    max-height: 85vh;
     overflow: hidden;
     animation: slideUp 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+        border-radius: 12px;
+    }
+
+    .modal-header {
+        padding: 16px 20px;
+    }
+
+    .modal-header h2 {
+        font-size: 1.25rem;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .setting-item {
+        margin-bottom: 20px;
+    }
+
+    .setting-label {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+
+    .api-key-input,
+    .llm-provider-select {
+        font-size: 16px; /* Prevent iOS zoom on input focus */
+    }
 }
 
 .modal-header {
@@ -341,6 +375,24 @@ body.dark-theme .copy-button {
     font-weight: 600;
     margin-bottom: 10px;
     color: #1d1d1f;
+}
+
+.api-key-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #fafafa;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+
+.api-key-input:focus {
+    outline: none;
+    border-color: #007AFF;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 .api-key-input-group {
@@ -405,6 +457,30 @@ body.dark-theme .copy-button {
         transform: translateY(0);
         opacity: 1;
     }
+}
+
+/* LLM Provider Select */
+.llm-provider-select {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 1rem;
+    border: 2px solid #d1d1d6;
+    border-radius: 8px;
+    background-color: white;
+    color: #1d1d1f;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.llm-provider-select:hover {
+    border-color: #007AFF;
+}
+
+.llm-provider-select:focus {
+    outline: none;
+    border-color: #007AFF;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
 /* Save button styles */
@@ -473,6 +549,18 @@ body.dark-theme .setting-label {
     color: #f5f5f7;
 }
 
+body.dark-theme .api-key-input {
+    background: #1c1c1e;
+    color: #f5f5f7;
+    border-color: #3a3a3c;
+}
+
+body.dark-theme .api-key-input:focus {
+    border-color: #34C759;
+    background: #1c1c1e;
+    box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.15);
+}
+
 body.dark-theme .api-key-input-group input {
     background: #1c1c1e;
     color: #f5f5f7;
@@ -487,6 +575,21 @@ body.dark-theme .api-key-input-group input:focus {
 
 body.dark-theme .setting-hint {
     color: #8e8e93;
+}
+
+body.dark-theme .llm-provider-select {
+    background-color: #3a3a3c;
+    color: #f5f5f7;
+    border-color: #48484a;
+}
+
+body.dark-theme .llm-provider-select:hover {
+    border-color: #0a84ff;
+}
+
+body.dark-theme .llm-provider-select:focus {
+    border-color: #0a84ff;
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
 }
 
 body.dark-theme .save-api-key-button {

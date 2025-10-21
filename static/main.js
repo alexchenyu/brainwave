@@ -23,6 +23,15 @@ const settingsButton = document.getElementById('settingsButton');
 const settingsModal = document.getElementById('settingsModal');
 const closeModal = document.getElementById('closeModal');
 const apiKeyStatusText = document.getElementById('apiKeyStatusText');
+const llmProviderSelect = document.getElementById('llmProviderSelect');
+const openaiSettingsSection = document.getElementById('openaiSettingsSection');
+const compatibleSettingsSection = document.getElementById('compatibleSettingsSection');
+const openaiModelSelect = document.getElementById('openaiModelSelect');
+const compatibleBaseUrlInput = document.getElementById('compatibleBaseUrlInput');
+const compatibleModelInput = document.getElementById('compatibleModelInput');
+const compatibleApiKeyInput = document.getElementById('compatibleApiKeyInput');
+const saveCompatibleButton = document.getElementById('saveCompatibleButton');
+const compatibleStatusText = document.getElementById('compatibleStatusText');
 
 // Configuration
 const targetSeconds = 5;
@@ -34,6 +43,11 @@ const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile
 
 // API Key management
 let userApiKey = null;
+let openaiModel = 'gpt-4o';
+let compatibleBaseUrl = null;
+let compatibleModel = null;
+let compatibleApiKey = null;
+let llmProvider = 'compatible'; // Default to compatible (for GLM)
 
 function openSettingsModal() {
     settingsModal.classList.add('active');
@@ -54,24 +68,82 @@ function updateApiKeyStatus() {
     }
 }
 
+function updateCompatibleStatus() {
+    if (compatibleBaseUrl && compatibleModel && compatibleApiKey) {
+        compatibleStatusText.textContent = 'Saved';
+        compatibleStatusText.classList.add('saved');
+    } else {
+        compatibleStatusText.textContent = '';
+        compatibleStatusText.classList.remove('saved');
+    }
+}
+
 function loadApiKey() {
+    // Load OpenAI settings
     const savedKey = localStorage.getItem('openai_api_key');
     if (savedKey) {
         userApiKey = savedKey;
         apiKeyInput.value = savedKey;
         updateApiKeyStatus();
-    } else {
-        // If no API key, open settings modal on first visit
-        const hasSeenSettings = localStorage.getItem('has_seen_settings');
-        if (!hasSeenSettings) {
-            openSettingsModal();
-            localStorage.setItem('has_seen_settings', 'true');
-        }
     }
+
+    const savedModel = localStorage.getItem('openai_model');
+    if (savedModel) {
+        openaiModel = savedModel;
+        openaiModelSelect.value = savedModel;
+    }
+
+    // Load Compatible settings
+    const savedBaseUrl = localStorage.getItem('compatible_base_url');
+    const savedCompatibleModel = localStorage.getItem('compatible_model');
+    const savedCompatibleKey = localStorage.getItem('compatible_api_key');
+
+    if (savedBaseUrl) {
+        compatibleBaseUrl = savedBaseUrl;
+        compatibleBaseUrlInput.value = savedBaseUrl;
+    }
+    if (savedCompatibleModel) {
+        compatibleModel = savedCompatibleModel;
+        compatibleModelInput.value = savedCompatibleModel;
+    }
+    if (savedCompatibleKey) {
+        compatibleApiKey = savedCompatibleKey;
+        compatibleApiKeyInput.value = savedCompatibleKey;
+    }
+    updateCompatibleStatus();
+
+    // Load saved LLM provider preference
+    const savedProvider = localStorage.getItem('llm_provider');
+    if (savedProvider) {
+        llmProvider = savedProvider;
+        llmProviderSelect.value = savedProvider;
+    }
+
+    // Show/hide sections based on provider
+    updateSettingsVisibility();
+}
+
+function updateSettingsVisibility() {
+    if (llmProvider === 'compatible') {
+        compatibleSettingsSection.style.display = 'block';
+        openaiSettingsSection.style.display = 'none';
+    } else {
+        compatibleSettingsSection.style.display = 'none';
+        openaiSettingsSection.style.display = 'block';
+    }
+}
+
+function saveLLMProvider() {
+    const provider = llmProviderSelect.value;
+    llmProvider = provider;
+    localStorage.setItem('llm_provider', provider);
+    updateSettingsVisibility();
 }
 
 function saveApiKey() {
     const apiKey = apiKeyInput.value.trim();
+    const model = openaiModelSelect.value;
+
     if (!apiKey) {
         alert('Please enter an API key');
         return;
@@ -83,7 +155,9 @@ function saveApiKey() {
     }
 
     userApiKey = apiKey;
+    openaiModel = model;
     localStorage.setItem('openai_api_key', apiKey);
+    localStorage.setItem('openai_model', model);
 
     // Send API key to server via WebSocket
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -102,11 +176,55 @@ function saveApiKey() {
     }, 1000);
 }
 
+function saveCompatibleSettings() {
+    const baseUrl = compatibleBaseUrlInput.value.trim();
+    const model = compatibleModelInput.value.trim();
+    const apiKey = compatibleApiKeyInput.value.trim();
+
+    if (!baseUrl) {
+        alert('Please enter base URL');
+        return;
+    }
+
+    if (!model) {
+        alert('Please enter model name');
+        return;
+    }
+
+    if (!apiKey) {
+        alert('Please enter API key');
+        return;
+    }
+
+    compatibleBaseUrl = baseUrl;
+    compatibleModel = model;
+    compatibleApiKey = apiKey;
+    localStorage.setItem('compatible_base_url', baseUrl);
+    localStorage.setItem('compatible_model', model);
+    localStorage.setItem('compatible_api_key', apiKey);
+
+    updateCompatibleStatus();
+    showCompatibleFeedback('Saved!');
+
+    // Close modal after a short delay
+    setTimeout(() => {
+        closeSettingsModal();
+    }, 1000);
+}
+
 function showApiKeyFeedback(message) {
     const originalText = saveApiKeyButton.textContent;
     saveApiKeyButton.textContent = message;
     setTimeout(() => {
         saveApiKeyButton.textContent = originalText;
+    }, 2000);
+}
+
+function showCompatibleFeedback(message) {
+    const originalText = saveCompatibleButton.textContent;
+    saveCompatibleButton.textContent = message;
+    setTimeout(() => {
+        saveCompatibleButton.textContent = originalText;
     }, 2000);
 }
 
@@ -271,6 +389,13 @@ function initializeWebSocket() {
 async function startRecording() {
     if (isRecording) return;
 
+    // Check if OpenAI API key is set
+    if (!userApiKey) {
+        alert('Please set your OpenAI API key in Settings before starting recording.');
+        openSettingsModal();
+        return;
+    }
+
     try {
         transcript.value = '';
         enhancedTranscript.value = '';
@@ -297,11 +422,11 @@ async function startRecording() {
 
         isRecording = true;
         await ws.send(JSON.stringify({ type: 'start_recording' }));
-        
+
         startTimer();
         recordButton.textContent = 'Stop';
         recordButton.classList.add('recording');
-        
+
     } catch (error) {
         console.error('Error starting recording:', error);
         alert('Error accessing microphone: ' + error.message);
@@ -333,8 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
     copyButton.onclick = () => copyToClipboard(transcript.value, copyButton);
     copyEnhancedButton.onclick = () => copyToClipboard(enhancedTranscript.value, copyEnhancedButton);
     saveApiKeyButton.onclick = saveApiKey;
+    saveCompatibleButton.onclick = saveCompatibleSettings;
     settingsButton.onclick = openSettingsModal;
     closeModal.onclick = closeSettingsModal;
+    llmProviderSelect.onchange = saveLLMProvider;
 
     // Close modal when clicking outside
     settingsModal.onclick = (e) => {
@@ -381,13 +508,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
         const apiKey = getApiKey();
+        const requestBody = {
+            text: inputText,
+            llm_provider: llmProvider
+        };
+
+        if (llmProvider === 'openai') {
+            requestBody.api_key = apiKey;
+            requestBody.openai_model = openaiModel || 'gpt-4o';
+        } else {
+            requestBody.compatible_base_url = compatibleBaseUrl || '';
+            requestBody.compatible_model = compatibleModel || '';
+            requestBody.compatible_api_key = compatibleApiKey || '';
+        }
+
         const response = await fetch('/api/v1/readability', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: inputText,
-                api_key: apiKey
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) throw new Error('Readability enhancement failed');
@@ -425,13 +563,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
         const apiKey = getApiKey();
+        const requestBody = {
+            text: inputText,
+            llm_provider: llmProvider
+        };
+
+        if (llmProvider === 'openai') {
+            requestBody.api_key = apiKey;
+            requestBody.openai_model = openaiModel || 'gpt-4o';
+        } else {
+            requestBody.compatible_base_url = compatibleBaseUrl || '';
+            requestBody.compatible_model = compatibleModel || '';
+            requestBody.compatible_api_key = compatibleApiKey || '';
+        }
+
         const response = await fetch('/api/v1/ask_ai', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: inputText,
-                api_key: apiKey
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) throw new Error('AI request failed');
@@ -469,13 +618,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
         const apiKey = getApiKey();
+        const requestBody = {
+            text: inputText,
+            llm_provider: llmProvider
+        };
+
+        if (llmProvider === 'openai') {
+            requestBody.api_key = apiKey;
+            requestBody.openai_model = openaiModel || 'gpt-4o';
+        } else {
+            requestBody.compatible_base_url = compatibleBaseUrl || '';
+            requestBody.compatible_model = compatibleModel || '';
+            requestBody.compatible_api_key = compatibleApiKey || '';
+        }
+
         const response = await fetch('/api/v1/correctness', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: inputText,
-                api_key: apiKey
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) throw new Error('Correctness check failed');

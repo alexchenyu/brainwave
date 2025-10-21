@@ -3,7 +3,7 @@
 <head>
     <title>AI Voice Input</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" type="text/css" href="static/style.css?v=4">
+    <link rel="stylesheet" type="text/css" href="static/style.css?v=10">
 </head>
 <body>
     <div class="container">
@@ -36,7 +36,26 @@
             </div>
             <div class="modal-body">
                 <div class="setting-item">
-                    <label for="apiKeyInput" class="setting-label">OpenAI API Key</label>
+                    <label for="llmProviderSelect" class="setting-label">LLM Provider for text processing</label>
+                    <select id="llmProviderSelect" class="llm-provider-select">
+                        <option value="openai">OpenAI (Official)</option>
+                        <option value="compatible">OpenAI Compatible (Custom)</option>
+                    </select>
+                    <div class="setting-hint">
+                        Choose which model provider to use for text processing
+                    </div>
+                </div>
+
+                <div class="setting-item" id="openaiSettingsSection">
+                    <label for="openaiModelSelect" class="setting-label">Model</label>
+                    <select id="openaiModelSelect" class="llm-provider-select">
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </select>
+
+                    <label for="apiKeyInput" class="setting-label" style="margin-top: 15px;">OpenAI API Key</label>
                     <div class="api-key-input-group">
                         <input type="password" id="apiKeyInput" placeholder="sk-..." />
                         <button id="saveApiKeyButton" class="save-api-key-button">Save</button>
@@ -46,10 +65,28 @@
                         Your API key is stored locally in your browser
                     </div>
                 </div>
+
+                <div class="setting-item" id="compatibleSettingsSection">
+                    <label for="compatibleBaseUrlInput" class="setting-label">Base URL</label>
+                    <input type="text" id="compatibleBaseUrlInput" class="api-key-input" placeholder="https://api.365ui.com/v1" />
+
+                    <label for="compatibleModelInput" class="setting-label" style="margin-top: 15px;">Model Name</label>
+                    <input type="text" id="compatibleModelInput" class="api-key-input" placeholder="GLM-4.6-FP8" />
+
+                    <label for="compatibleApiKeyInput" class="setting-label" style="margin-top: 15px;">API Key</label>
+                    <div class="api-key-input-group">
+                        <input type="password" id="compatibleApiKeyInput" placeholder="sk-..." />
+                        <button id="saveCompatibleButton" class="save-api-key-button">Save</button>
+                    </div>
+                    <div class="setting-hint">
+                        <span id="compatibleStatusText" class="api-key-status-indicator"></span>
+                        For GLM, Ollama, vLLM, or any OpenAI-compatible API
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="static/main.js?v=5"></script>
+    <script src="static/main.js?v=10"></script>
 </body>
 </html>

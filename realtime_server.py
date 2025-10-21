@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 class ReadabilityRequest(BaseModel):
     text: str = Field(..., description="The text to improve readability for.")
     api_key: str = Field(None, description="Optional OpenAI API key")
+    llm_provider: str = Field("compatible", description="LLM provider: 'openai' or 'compatible'")
+    openai_model: str = Field("gpt-4o", description="OpenAI model name")
+    compatible_base_url: str = Field(None, description="Optional compatible API base URL")
+    compatible_model: str = Field(None, description="Optional compatible model name")
+    compatible_api_key: str = Field(None, description="Optional compatible API key")
 
 class ReadabilityResponse(BaseModel):
     enhanced_text: str = Field(..., description="The text with improved readability.")
@@ -37,6 +42,11 @@ class ReadabilityResponse(BaseModel):
 class CorrectnessRequest(BaseModel):
     text: str = Field(..., description="The text to check for factual correctness.")
     api_key: str = Field(None, description="Optional OpenAI API key")
+    llm_provider: str = Field("compatible", description="LLM provider: 'openai' or 'compatible'")
+    openai_model: str = Field("gpt-4o", description="OpenAI model name")
+    compatible_base_url: str = Field(None, description="Optional compatible API base URL")
+    compatible_model: str = Field(None, description="Optional compatible model name")
+    compatible_api_key: str = Field(None, description="Optional compatible API key")
 
 class CorrectnessResponse(BaseModel):
     analysis: str = Field(..., description="The factual correctness analysis.")
@@ -44,6 +54,11 @@ class CorrectnessResponse(BaseModel):
 class AskAIRequest(BaseModel):
     text: str = Field(..., description="The question to ask AI.")
     api_key: str = Field(None, description="Optional OpenAI API key")
+    llm_provider: str = Field("compatible", description="LLM provider: 'openai' or 'compatible'")
+    openai_model: str = Field("gpt-4o", description="OpenAI model name")
+    compatible_base_url: str = Field(None, description="Optional compatible API base URL")
+    compatible_model: str = Field(None, description="Optional compatible model name")
+    compatible_api_key: str = Field(None, description="Optional compatible API key")
 
 class AskAIResponse(BaseModel):
     answer: str = Field(..., description="AI's answer to the question.")
@@ -477,17 +492,21 @@ async def enhance_readability(request: ReadabilityRequest):
         raise HTTPException(status_code=500, detail="Readability prompt not found.")
 
     try:
-        # 优先使用 GLM-4.6-FP8，降低成本
-        if USE_GLM:
-            processor = get_llm_processor("GLM-4.6-FP8")
-            logger.info("Using GLM-4.6-FP8 for readability enhancement")
+        # 根据用户选择使用 OpenAI 或 Compatible
+        if request.llm_provider == "compatible":
+            # Use OpenAI Compatible API (GLM, vLLM, Ollama, etc.)
+            processor = get_llm_processor(request.compatible_model or "GLM-4.6-FP8",
+                                         glm_host=request.compatible_base_url,
+                                         glm_api_key=request.compatible_api_key)
+            logger.info(f"Using compatible API with model {request.compatible_model} for readability enhancement")
         else:
-            # Fallback to OpenAI
+            # Use OpenAI Official
             api_key = request.api_key or OPENAI_API_KEY
             if not api_key:
                 raise HTTPException(status_code=400, detail="OpenAI API key is required.")
-            processor = get_llm_processor("gpt-4o", api_key=api_key)
-            logger.info("Using GPT-4o for readability enhancement")
+            model = request.openai_model or "gpt-4o"
+            processor = get_llm_processor(model, api_key=api_key)
+            logger.info(f"Using OpenAI {model} for readability enhancement")
 
         async def text_generator():
             async for part in processor.process_text(request.text, prompt):
@@ -511,17 +530,21 @@ async def ask_ai(request: AskAIRequest):
         raise HTTPException(status_code=500, detail="Ask AI prompt not found.")
 
     try:
-        # 优先使用 GLM-4.6-FP8
-        if USE_GLM:
-            processor = get_llm_processor("GLM-4.6-FP8")
-            logger.info("Using GLM-4.6-FP8 for AI question")
+        # 根据用户选择使用 OpenAI 或 Compatible
+        if request.llm_provider == "compatible":
+            # Use OpenAI Compatible API (GLM, vLLM, Ollama, etc.)
+            processor = get_llm_processor(request.compatible_model or "GLM-4.6-FP8",
+                                         glm_host=request.compatible_base_url,
+                                         glm_api_key=request.compatible_api_key)
+            logger.info(f"Using compatible API with model {request.compatible_model} for AI question")
         else:
-            # Fallback to OpenAI o1-mini
+            # Use OpenAI Official
             api_key = request.api_key or OPENAI_API_KEY
             if not api_key:
                 raise HTTPException(status_code=400, detail="OpenAI API key is required.")
-            processor = get_llm_processor("gpt-4o", api_key=api_key)
-            logger.info("Using GPT-4o for AI question")
+            model = request.openai_model or "gpt-4o"
+            processor = get_llm_processor(model, api_key=api_key)
+            logger.info(f"Using OpenAI {model} for AI question")
 
         async def text_generator():
             async for part in processor.process_text(request.text, prompt):
@@ -545,17 +568,21 @@ async def check_correctness(request: CorrectnessRequest):
         raise HTTPException(status_code=500, detail="Correctness prompt not found.")
 
     try:
-        # 优先使用 GLM-4.6-FP8
-        if USE_GLM:
-            processor = get_llm_processor("GLM-4.6-FP8")
-            logger.info("Using GLM-4.6-FP8 for correctness check")
+        # 根据用户选择使用 OpenAI 或 Compatible
+        if request.llm_provider == "compatible":
+            # Use OpenAI Compatible API (GLM, vLLM, Ollama, etc.)
+            processor = get_llm_processor(request.compatible_model or "GLM-4.6-FP8",
+                                         glm_host=request.compatible_base_url,
+                                         glm_api_key=request.compatible_api_key)
+            logger.info(f"Using compatible API with model {request.compatible_model} for correctness check")
         else:
-            # Fallback to OpenAI GPT-4o
+            # Use OpenAI Official
             api_key = request.api_key or OPENAI_API_KEY
             if not api_key:
                 raise HTTPException(status_code=400, detail="OpenAI API key is required.")
-            processor = get_llm_processor("gpt-4o", api_key=api_key)
-            logger.info("Using GPT-4o for correctness check")
+            model = request.openai_model or "gpt-4o"
+            processor = get_llm_processor(model, api_key=api_key)
+            logger.info(f"Using OpenAI {model} for correctness check")
 
         async def text_generator():
             async for part in processor.process_text(request.text, prompt):
