@@ -2,3 +2,4 @@
 .windsurfrules
 scratchpad.md
 .env
+__pycache__/

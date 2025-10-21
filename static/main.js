@@ -171,19 +171,24 @@ function initializeWebSocket() {
 // Recording control
 async function startRecording() {
     if (isRecording) return;
-    
+
     try {
         transcript.value = '';
         enhancedTranscript.value = '';
 
         if (!streamInitialized) {
-            stream = await navigator.mediaDevices.getUserMedia({ 
+            // Check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Your browser does not support microphone access. Please use HTTPS or localhost, and ensure you are using a modern browser.');
+            }
+
+            stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     channelCount: 1,
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true
-                } 
+                }
             });
             streamInitialized = true;
         }
