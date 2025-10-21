@@ -17,6 +17,8 @@ const copyEnhancedButton = document.getElementById('copyEnhancedButton');
 const readabilityButton = document.getElementById('readabilityButton');
 const askAIButton = document.getElementById('askAIButton');
 const correctnessButton = document.getElementById('correctnessButton');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const saveApiKeyButton = document.getElementById('saveApiKeyButton');
 
 // Configuration
 const targetSeconds = 5;
@@ -25,6 +27,51 @@ const autoStart = urlParams.get('start') === '1';
 
 // Utility functions
 const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+// API Key management
+let userApiKey = null;
+
+function loadApiKey() {
+    const savedKey = localStorage.getItem('openai_api_key');
+    if (savedKey) {
+        userApiKey = savedKey;
+        apiKeyInput.value = savedKey;
+        showApiKeyFeedback('Loaded');
+    }
+}
+
+function saveApiKey() {
+    const apiKey = apiKeyInput.value.trim();
+    if (!apiKey) {
+        alert('Please enter an API key');
+        return;
+    }
+
+    userApiKey = apiKey;
+    localStorage.setItem('openai_api_key', apiKey);
+
+    // Send API key to server via WebSocket
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type: 'set_api_key',
+            api_key: apiKey
+        }));
+    }
+
+    showApiKeyFeedback('Saved');
+}
+
+function showApiKeyFeedback(message) {
+    const originalText = saveApiKeyButton.textContent;
+    saveApiKeyButton.textContent = message;
+    setTimeout(() => {
+        saveApiKeyButton.textContent = originalText;
+    }, 2000);
+}
+
+function getApiKey() {
+    return userApiKey || null;
+}
 
 async function copyToClipboard(text, button) {
     if (!text) return;
@@ -129,10 +176,19 @@ function updateConnectionStatus(status) {
 function initializeWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     ws = new WebSocket(`${protocol}://${window.location.host}/api/v1/ws`);
-    
+
     ws.onopen = () => {
         wsConnected = true;
         updateConnectionStatus(true);
+
+        // Send API key to server if available
+        if (userApiKey) {
+            ws.send(JSON.stringify({
+                type: 'set_api_key',
+                api_key: userApiKey
+            }));
+        }
+
         if (autoStart && !isRecording && !isAutoStarted) startRecording();
     };
     
@@ -231,6 +287,7 @@ async function stopRecording() {
 recordButton.onclick = () => isRecording ? stopRecording() : startRecording();
 copyButton.onclick = () => copyToClipboard(transcript.value, copyButton);
 copyEnhancedButton.onclick = () => copyToClipboard(enhancedTranscript.value, copyEnhancedButton);
+saveApiKeyButton.onclick = saveApiKey;
 
 // Handle spacebar toggle
 document.addEventListener('keydown', (event) => {
@@ -245,6 +302,7 @@ document.addEventListener('keydown', (event) => {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    loadApiKey();
     initializeWebSocket();
     initializeTheme();
     if (autoStart) initializeAudioStream();
@@ -260,10 +318,14 @@ readabilityButton.onclick = async () => {
     }
 
     try {
+        const apiKey = getApiKey();
         const response = await fetch('/api/v1/readability', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: inputText })
+            body: JSON.stringify({
+                text: inputText,
+                api_key: apiKey
+            })
         });
 
         if (!response.ok) throw new Error('Readability enhancement failed');
@@ -300,10 +362,14 @@ askAIButton.onclick = async () => {
     }
 
     try {
+        const apiKey = getApiKey();
         const response = await fetch('/api/v1/ask_ai', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: inputText })
+            body: JSON.stringify({
+                text: inputText,
+                api_key: apiKey
+            })
         });
 
         if (!response.ok) throw new Error('AI request failed');
@@ -330,10 +396,14 @@ correctnessButton.onclick = async () => {
     }
 
     try {
+        const apiKey = getApiKey();
         const response = await fetch('/api/v1/correctness', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: inputText })
+            body: JSON.stringify({
+                text: inputText,
+                api_key: apiKey
+            })
         });
 
         if (!response.ok) throw new Error('Correctness check failed');

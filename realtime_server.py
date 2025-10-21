@@ -29,31 +29,36 @@ logger = logging.getLogger(__name__)
 # Pydantic models for request and response schemas
 class ReadabilityRequest(BaseModel):
     text: str = Field(..., description="The text to improve readability for.")
+    api_key: str = Field(None, description="Optional OpenAI API key")
 
 class ReadabilityResponse(BaseModel):
     enhanced_text: str = Field(..., description="The text with improved readability.")
 
 class CorrectnessRequest(BaseModel):
     text: str = Field(..., description="The text to check for factual correctness.")
+    api_key: str = Field(None, description="Optional OpenAI API key")
 
 class CorrectnessResponse(BaseModel):
     analysis: str = Field(..., description="The factual correctness analysis.")
 
 class AskAIRequest(BaseModel):
     text: str = Field(..., description="The question to ask AI.")
+    api_key: str = Field(None, description="Optional OpenAI API key")
 
 class AskAIResponse(BaseModel):
     answer: str = Field(..., description="AI's answer to the question.")
 
 app = FastAPI()
 
+# Make API key optional from environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    logger.error("OPENAI_API_KEY is not set in environment variables.")
-    raise EnvironmentError("OPENAI_API_KEY is not set.")
-
-# Initialize with a default model
-llm_processor = get_llm_processor("gpt-4o")  # Default processor
+if OPENAI_API_KEY:
+    logger.info("Using OPENAI_API_KEY from environment variables.")
+    # Initialize with a default model if API key is available
+    llm_processor = get_llm_processor("gpt-4o")
+else:
+    logger.warning("OPENAI_API_KEY not found in environment. API key must be provided by the user.")
+    llm_processor = None
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -97,13 +102,13 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info("New WebSocket connection attempt")
     await websocket.accept()
     logger.info("WebSocket connection accepted")
-    
+
     # Add initial status update here
     await websocket.send_text(json.dumps({
         "type": "status",
         "status": "idle"  # Set initial status to idle (blue)
     }))
-    
+
     client = None
     audio_processor = AudioProcessor()
     audio_buffer = []
@@ -120,14 +125,21 @@ async def websocket_endpoint(websocket: WebSocket):
     response_buffer = []
     marker_seen = False
     delta_counter = 0
-    
+    # Store user's API key
+    user_api_key = None
+
     async def initialize_openai():
         nonlocal client
         try:
             # Clear the ready flag while initializing
             openai_ready.clear()
-            
-            client = OpenAIRealtimeAudioTextClient(os.getenv("OPENAI_API_KEY"))
+
+            # Use user's API key if provided, otherwise fall back to environment variable
+            api_key = user_api_key or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("No API key provided. Please set your OpenAI API key.")
+
+            client = OpenAIRealtimeAudioTextClient(api_key)
             await client.connect()
             logger.info("Successfully connected to OpenAI client")
             
@@ -314,8 +326,18 @@ async def websocket_endpoint(websocket: WebSocket):
                             
                     elif "text" in data:
                         msg = json.loads(data["text"])
-                        
-                        if msg.get("type") == "start_recording":
+
+                        if msg.get("type") == "set_api_key":
+                            # Handle API key setting
+                            nonlocal user_api_key
+                            user_api_key = msg.get("api_key")
+                            logger.info("API key received from user")
+                            await websocket.send_text(json.dumps({
+                                "type": "api_key_status",
+                                "status": "saved"
+                            }))
+
+                        elif msg.get("type") == "start_recording":
                             # Update status to connecting while initializing OpenAI
                             await websocket.send_text(json.dumps({
                                 "type": "status",
@@ -440,9 +462,16 @@ async def enhance_readability(request: ReadabilityRequest):
         raise HTTPException(status_code=500, detail="Readability prompt not found.")
 
     try:
+        # Use user's API key if provided, otherwise use environment variable
+        api_key = request.api_key or OPENAI_API_KEY
+        if not api_key:
+            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
+
+        processor = get_llm_processor("gpt-4o", api_key=api_key)
+
         async def text_generator():
             # Use gpt-4o specifically for readability
-            async for part in llm_processor.process_text(request.text, prompt, model="gpt-4o"):
+            async for part in processor.process_text(request.text, prompt, model="gpt-4o"):
                 yield part
 
         return StreamingResponse(text_generator(), media_type="text/plain")
@@ -463,8 +492,14 @@ def ask_ai(request: AskAIRequest):
         raise HTTPException(status_code=500, detail="Ask AI prompt not found.")
 
     try:
+        # Use user's API key if provided, otherwise use environment variable
+        api_key = request.api_key or OPENAI_API_KEY
+        if not api_key:
+            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
+
+        processor = get_llm_processor("o1-mini", api_key=api_key)
         # Use o1-mini specifically for ask_ai
-        answer = llm_processor.process_text_sync(request.text, prompt, model="o1-mini")
+        answer = processor.process_text_sync(request.text, prompt, model="o1-mini")
         return AskAIResponse(answer=answer)
     except Exception as e:
         logger.error(f"Error processing AI question: {e}", exc_info=True)
@@ -482,9 +517,16 @@ async def check_correctness(request: CorrectnessRequest):
         raise HTTPException(status_code=500, detail="Correctness prompt not found.")
 
     try:
+        # Use user's API key if provided, otherwise use environment variable
+        api_key = request.api_key or OPENAI_API_KEY
+        if not api_key:
+            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
+
+        processor = get_llm_processor("gpt-4o", api_key=api_key)
+
         async def text_generator():
             # Specifically use gpt-4o for correctness checking
-            async for part in llm_processor.process_text(request.text, prompt, model="gpt-4o"):
+            async for part in processor.process_text(request.text, prompt, model="gpt-4o"):
                 yield part
 
         return StreamingResponse(text_generator(), media_type="text/plain")
