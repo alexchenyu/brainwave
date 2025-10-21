@@ -19,6 +19,10 @@ const askAIButton = document.getElementById('askAIButton');
 const correctnessButton = document.getElementById('correctnessButton');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const saveApiKeyButton = document.getElementById('saveApiKeyButton');
+const settingsButton = document.getElementById('settingsButton');
+const settingsModal = document.getElementById('settingsModal');
+const closeModal = document.getElementById('closeModal');
+const apiKeyStatusText = document.getElementById('apiKeyStatusText');
 
 // Configuration
 const targetSeconds = 5;
@@ -31,12 +35,38 @@ const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile
 // API Key management
 let userApiKey = null;
 
+function openSettingsModal() {
+    settingsModal.classList.add('active');
+    apiKeyInput.focus();
+}
+
+function closeSettingsModal() {
+    settingsModal.classList.remove('active');
+}
+
+function updateApiKeyStatus() {
+    if (userApiKey) {
+        apiKeyStatusText.textContent = 'Saved';
+        apiKeyStatusText.classList.add('saved');
+    } else {
+        apiKeyStatusText.textContent = '';
+        apiKeyStatusText.classList.remove('saved');
+    }
+}
+
 function loadApiKey() {
     const savedKey = localStorage.getItem('openai_api_key');
     if (savedKey) {
         userApiKey = savedKey;
         apiKeyInput.value = savedKey;
-        showApiKeyFeedback('Loaded');
+        updateApiKeyStatus();
+    } else {
+        // If no API key, open settings modal on first visit
+        const hasSeenSettings = localStorage.getItem('has_seen_settings');
+        if (!hasSeenSettings) {
+            openSettingsModal();
+            localStorage.setItem('has_seen_settings', 'true');
+        }
     }
 }
 
@@ -44,6 +74,11 @@ function saveApiKey() {
     const apiKey = apiKeyInput.value.trim();
     if (!apiKey) {
         alert('Please enter an API key');
+        return;
+    }
+
+    if (!apiKey.startsWith('sk-')) {
+        alert('Invalid API key format. OpenAI API keys start with "sk-"');
         return;
     }
 
@@ -58,7 +93,13 @@ function saveApiKey() {
         }));
     }
 
-    showApiKeyFeedback('Saved');
+    updateApiKeyStatus();
+    showApiKeyFeedback('Saved!');
+
+    // Close modal after a short delay
+    setTimeout(() => {
+        closeSettingsModal();
+    }, 1000);
 }
 
 function showApiKeyFeedback(message) {
@@ -153,8 +194,10 @@ async function initAudio(stream) {
 // WebSocket handling
 function updateConnectionStatus(status) {
     const statusDot = document.getElementById('connectionStatus');
+    if (!statusDot) return; // Element removed, skip status updates
+
     statusDot.classList.remove('connected', 'connecting', 'idle');
-    
+
     switch (status) {
         case 'connected':  // OpenAI is connected and ready
             statusDot.classList.add('connected');
@@ -283,32 +326,51 @@ async function stopRecording() {
     recordButton.classList.remove('recording');
 }
 
-// Event listeners
-recordButton.onclick = () => isRecording ? stopRecording() : startRecording();
-copyButton.onclick = () => copyToClipboard(transcript.value, copyButton);
-copyEnhancedButton.onclick = () => copyToClipboard(enhancedTranscript.value, copyEnhancedButton);
-saveApiKeyButton.onclick = saveApiKey;
-
-// Handle spacebar toggle
-document.addEventListener('keydown', (event) => {
-    if (event.code === 'Space') {
-        const activeElement = document.activeElement;
-        if (!activeElement.tagName.match(/INPUT|TEXTAREA/) && !activeElement.isContentEditable) {
-            event.preventDefault();
-            recordButton.click();
-        }
-    }
-});
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    loadApiKey();
-    initializeWebSocket();
-    initializeTheme();
-    if (autoStart) initializeAudioStream();
-});
-// Readability and AI handlers
-readabilityButton.onclick = async () => {
+    // Event listeners
+    recordButton.onclick = () => isRecording ? stopRecording() : startRecording();
+    copyButton.onclick = () => copyToClipboard(transcript.value, copyButton);
+    copyEnhancedButton.onclick = () => copyToClipboard(enhancedTranscript.value, copyEnhancedButton);
+    saveApiKeyButton.onclick = saveApiKey;
+    settingsButton.onclick = openSettingsModal;
+    closeModal.onclick = closeSettingsModal;
+
+    // Close modal when clicking outside
+    settingsModal.onclick = (e) => {
+        if (e.target === settingsModal) {
+            closeSettingsModal();
+        }
+    };
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && settingsModal.classList.contains('active')) {
+            closeSettingsModal();
+        }
+    });
+
+    // Allow Enter key to save API key
+    apiKeyInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            saveApiKey();
+        }
+    });
+
+    // Handle spacebar toggle
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+            const activeElement = document.activeElement;
+            const modalOpen = settingsModal.classList.contains('active');
+            if (!activeElement.tagName.match(/INPUT|TEXTAREA/) && !activeElement.isContentEditable && !modalOpen) {
+                event.preventDefault();
+                recordButton.click();
+            }
+        }
+    });
+
+    // Readability and AI handlers
+    readabilityButton.onclick = async () => {
     startTimer();
     const inputText = transcript.value.trim();
     if (!inputText) {
@@ -350,9 +412,9 @@ readabilityButton.onclick = async () => {
         alert('Error enhancing readability');
         stopTimer();
     }
-};
+    };
 
-askAIButton.onclick = async () => {
+    askAIButton.onclick = async () => {
     startTimer();
     const inputText = transcript.value.trim();
     if (!inputText) {
@@ -384,9 +446,9 @@ askAIButton.onclick = async () => {
         alert('Error asking AI');
         stopTimer();
     }
-};
+    };
 
-correctnessButton.onclick = async () => {
+    correctnessButton.onclick = async () => {
     startTimer();
     const inputText = transcript.value.trim();
     if (!inputText) {
@@ -428,7 +490,17 @@ correctnessButton.onclick = async () => {
         alert('Error checking correctness');
         stopTimer();
     }
-};
+    };
+
+    // Theme toggle
+    document.getElementById('themeToggle').onclick = toggleTheme;
+
+    // Initialize
+    loadApiKey();
+    initializeWebSocket();
+    initializeTheme();
+    if (autoStart) initializeAudioStream();
+});
 
 // Theme handling
 function toggleTheme() {
@@ -447,12 +519,9 @@ function toggleTheme() {
 function initializeTheme() {
     const darkTheme = localStorage.getItem('darkTheme') === 'true';
     const themeToggle = document.getElementById('themeToggle');
-    
+
     if (darkTheme) {
         document.body.classList.add('dark-theme');
         themeToggle.textContent = '☀️';
     }
 }
-
-// Add to your existing event listeners
-document.getElementById('themeToggle').onclick = toggleTheme;

@@ -1,19 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Brainwave</title>
+    <title>AI Voice Input</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" type="text/css" href="static/style.css">
+    <link rel="stylesheet" type="text/css" href="static/style.css?v=3">
 </head>
 <body>
     <div class="container">
-        <div id="connectionStatus" class="connection-status"></div>
         <button id="themeToggle" class="theme-toggle">🌙</button>
-        <h1>Brainwave</h1>
-        <div class="api-key-container">
-            <input type="password" id="apiKeyInput" placeholder="Enter your OpenAI API Key" />
-            <button id="saveApiKeyButton" class="save-api-key-button">Save</button>
-        </div>
+        <button id="settingsButton" class="settings-button">⚙️</button>
+        <h1>AI Voice Input <span id="connectionStatus" class="connection-status"></span></h1>
         <div id="timer" style="text-align: center; margin-bottom: 15px; font-size: 1.2rem;">00:00</div>
         <button id="recordButton">Start</button>
         <div class="transcript-container">
@@ -30,6 +26,30 @@
             <button id="copyEnhancedButton" class="copy-button">Copy</button>
         </div>
     </div>
-    <script src="static/main.js"></script>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="closeModal" class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label for="apiKeyInput" class="setting-label">OpenAI API Key</label>
+                    <div class="api-key-input-group">
+                        <input type="password" id="apiKeyInput" placeholder="sk-..." />
+                        <button id="saveApiKeyButton" class="save-api-key-button">Save</button>
+                    </div>
+                    <div class="setting-hint">
+                        <span id="apiKeyStatusText" class="api-key-status-indicator"></span>
+                        Your API key is stored locally in your browser
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="static/main.js?v=3"></script>
 </body>
 </html>
