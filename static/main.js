@@ -436,9 +436,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!response.ok) throw new Error('AI request failed');
 
-        const result = await response.json();
-        enhancedTranscript.value = result.answer;
-        if (!isMobileDevice()) copyToClipboard(result.answer, copyEnhancedButton);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            fullText += decoder.decode(value, { stream: true });
+            enhancedTranscript.value = fullText;
+            enhancedTranscript.scrollTop = enhancedTranscript.scrollHeight;
+        }
+
+        if (!isMobileDevice()) copyToClipboard(fullText, copyEnhancedButton);
         stopTimer();
 
     } catch (error) {
