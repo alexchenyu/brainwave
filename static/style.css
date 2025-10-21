@@ -109,6 +109,12 @@ textarea {
     cursor: pointer;
     font-size: 0.9rem;
     z-index: 1;
+    opacity: 0.3;
+    transition: opacity 0.3s ease;
+}
+
+.copy-button:hover {
+    opacity: 1;
 }
 
 .button-container {
@@ -203,6 +209,11 @@ body.dark-theme #recordButton.recording {
 body.dark-theme .copy-button {
     background: #34C759;
     /* Green */
+    opacity: 0.3;
+}
+
+body.dark-theme .copy-button:hover {
+    opacity: 1;
 }
 
 @keyframes blink {
