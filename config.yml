@@ -1,0 +1,21 @@
+# pdf2md/config/default.yml
+llm_models:
+  GLM-4.6-FP8:
+    host: "http://us-agent.supermicro.com:4500/v1"
+    # host: "http://172.31.37.120:8000/v1"
+    api_key: "sk-a6IwJQ3_dJCANSipFXBcnw"
+    # model: "glm_45"
+    model: "GLM-4.6-FP8"
+    token_limit: 200000
+
+  grok-4:
+    host: "http://us-agent.supermicro.com:4500/v1"
+    api_key: "sk-a6IwJQ3_dJCANSipFXBcnw"
+    model: "grok-4-latest"
+    token_limit: 200000
+
+  grok-4-fast-non-reasoning:
+    host: "http://us-agent.supermicro.com:4500/v1"
+    api_key: "sk-a6IwJQ3_dJCANSipFXBcnw"
+    model: "grok-4-fast-non-reasoning"
+    token_limit: 2000000

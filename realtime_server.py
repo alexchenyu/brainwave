@@ -51,13 +51,28 @@ class AskAIResponse(BaseModel):
 app = FastAPI()
 
 # Make API key optional from environment variables
+# 配置 LLM - 优先使用 GLM-4.6-FP8（成本更低）
+USE_GLM = os.getenv("USE_GLM", "true").lower() == "true"  # 默认使用 GLM
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if OPENAI_API_KEY:
-    logger.info("Using OPENAI_API_KEY from environment variables.")
-    # Initialize with a default model if API key is available
+
+if USE_GLM:
+    try:
+        logger.info("Using GLM-4.6-FP8 from config.yml for text processing")
+        llm_processor = get_llm_processor("GLM-4.6-FP8")
+        logger.info("GLM processor initialized successfully")
+    except Exception as e:
+        logger.warning(f"Failed to initialize GLM processor: {e}")
+        if OPENAI_API_KEY:
+            logger.info("Fallback to OpenAI GPT-4o")
+            llm_processor = get_llm_processor("gpt-4o")
+        else:
+            logger.warning("No LLM available. API key must be provided by user.")
+            llm_processor = None
+elif OPENAI_API_KEY:
+    logger.info("Using OpenAI GPT-4o from environment variables")
     llm_processor = get_llm_processor("gpt-4o")
 else:
-    logger.warning("OPENAI_API_KEY not found in environment. API key must be provided by the user.")
+    logger.warning("No LLM configured. API key must be provided by user.")
     llm_processor = None
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -462,16 +477,20 @@ async def enhance_readability(request: ReadabilityRequest):
         raise HTTPException(status_code=500, detail="Readability prompt not found.")
 
     try:
-        # Use user's API key if provided, otherwise use environment variable
-        api_key = request.api_key or OPENAI_API_KEY
-        if not api_key:
-            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
-
-        processor = get_llm_processor("gpt-4o", api_key=api_key)
+        # 优先使用 GLM-4.6-FP8，降低成本
+        if USE_GLM:
+            processor = get_llm_processor("GLM-4.6-FP8")
+            logger.info("Using GLM-4.6-FP8 for readability enhancement")
+        else:
+            # Fallback to OpenAI
+            api_key = request.api_key or OPENAI_API_KEY
+            if not api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key is required.")
+            processor = get_llm_processor("gpt-4o", api_key=api_key)
+            logger.info("Using GPT-4o for readability enhancement")
 
         async def text_generator():
-            # Use gpt-4o specifically for readability
-            async for part in processor.process_text(request.text, prompt, model="gpt-4o"):
+            async for part in processor.process_text(request.text, prompt):
                 yield part
 
         return StreamingResponse(text_generator(), media_type="text/plain")
@@ -484,23 +503,32 @@ async def enhance_readability(request: ReadabilityRequest):
     "/api/v1/ask_ai",
     response_model=AskAIResponse,
     summary="Ask AI a Question",
-    description="Ask AI to provide insights using O1-mini model."
+    description="Ask AI to provide insights using GLM or O1-mini model."
 )
-def ask_ai(request: AskAIRequest):
+async def ask_ai(request: AskAIRequest):
     prompt = PROMPTS.get('ask-ai')
     if not prompt:
         raise HTTPException(status_code=500, detail="Ask AI prompt not found.")
 
     try:
-        # Use user's API key if provided, otherwise use environment variable
-        api_key = request.api_key or OPENAI_API_KEY
-        if not api_key:
-            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
+        # 优先使用 GLM-4.6-FP8
+        if USE_GLM:
+            processor = get_llm_processor("GLM-4.6-FP8")
+            logger.info("Using GLM-4.6-FP8 for AI question")
+        else:
+            # Fallback to OpenAI o1-mini
+            api_key = request.api_key or OPENAI_API_KEY
+            if not api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key is required.")
+            processor = get_llm_processor("gpt-4o", api_key=api_key)
+            logger.info("Using GPT-4o for AI question")
 
-        processor = get_llm_processor("o1-mini", api_key=api_key)
-        # Use o1-mini specifically for ask_ai
-        answer = processor.process_text_sync(request.text, prompt, model="o1-mini")
-        return AskAIResponse(answer=answer)
+        async def text_generator():
+            async for part in processor.process_text(request.text, prompt):
+                yield part
+
+        return StreamingResponse(text_generator(), media_type="text/plain")
+
     except Exception as e:
         logger.error(f"Error processing AI question: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error processing AI question.")
@@ -517,16 +545,20 @@ async def check_correctness(request: CorrectnessRequest):
         raise HTTPException(status_code=500, detail="Correctness prompt not found.")
 
     try:
-        # Use user's API key if provided, otherwise use environment variable
-        api_key = request.api_key or OPENAI_API_KEY
-        if not api_key:
-            raise HTTPException(status_code=400, detail="OpenAI API key is required. Please set your API key.")
-
-        processor = get_llm_processor("gpt-4o", api_key=api_key)
+        # 优先使用 GLM-4.6-FP8
+        if USE_GLM:
+            processor = get_llm_processor("GLM-4.6-FP8")
+            logger.info("Using GLM-4.6-FP8 for correctness check")
+        else:
+            # Fallback to OpenAI GPT-4o
+            api_key = request.api_key or OPENAI_API_KEY
+            if not api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key is required.")
+            processor = get_llm_processor("gpt-4o", api_key=api_key)
+            logger.info("Using GPT-4o for correctness check")
 
         async def text_generator():
-            # Specifically use gpt-4o for correctness checking
-            async for part in processor.process_text(request.text, prompt, model="gpt-4o"):
+            async for part in processor.process_text(request.text, prompt):
                 yield part
 
         return StreamingResponse(text_generator(), media_type="text/plain")

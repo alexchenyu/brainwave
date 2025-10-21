@@ -4,6 +4,7 @@ import google.generativeai as genai
 from openai import OpenAI, AsyncOpenAI
 from typing import AsyncGenerator, Generator, Optional
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -87,11 +88,76 @@ class GPTProcessor(LLMProcessor):
         )
         return response.choices[0].message.content
 
-def get_llm_processor(model: str, api_key: Optional[str] = None) -> LLMProcessor:
+class GLMProcessor(LLMProcessor):
+    """
+    GLM-4 Processor for self-hosted GLM models
+    Compatible with OpenAI API format
+    """
+    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None):
+        # 默认使用本地部署的 GLM-4
+        self.base_url = base_url or os.getenv("GLM_BASE_URL", "http://localhost:8000/v1")
+        self.api_key = api_key or os.getenv("GLM_API_KEY", "dummy-key")  # vLLM 不需要真实 key
+
+        # 使用 OpenAI 兼容的客户端
+        self.async_client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
+        self.sync_client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
+        self.default_model = "glm-4"
+        logger.info(f"GLMProcessor initialized with base_url: {self.base_url}")
+
+    async def process_text(self, text: str, prompt: str, model: Optional[str] = None) -> AsyncGenerator[str, None]:
+        all_prompt = f"{prompt}\n\n{text}"
+        model_name = model or self.default_model
+        logger.info(f"Using GLM model: {model_name} for processing")
+
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "user", "content": all_prompt}
+                ],
+                stream=True,
+                temperature=0.7,
+                max_tokens=2048
+            )
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            logger.error(f"GLM processing error: {e}")
+            raise
+
+    def process_text_sync(self, text: str, prompt: str, model: Optional[str] = None) -> str:
+        all_prompt = f"{prompt}\n\n{text}"
+        model_name = model or self.default_model
+        logger.info(f"Using GLM model: {model_name} for sync processing")
+
+        try:
+            response = self.sync_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "user", "content": all_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2048
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"GLM sync processing error: {e}")
+            raise
+
+def get_llm_processor(model: str, api_key: Optional[str] = None, base_url: Optional[str] = None) -> LLMProcessor:
     model = model.lower()
     if model.startswith(('gemini', 'gemini-')):
         return GeminiProcessor(default_model=model)
     elif model.startswith(('gpt-', 'o1-')):
         return GPTProcessor(api_key=api_key)
+    elif model.startswith(('glm', 'glm-')):
+        return GLMProcessor(base_url=base_url, api_key=api_key)
     else:
         raise ValueError(f"Unsupported model type: {model}")
