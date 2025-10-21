@@ -11,5 +11,5 @@ dependencies = [
     "openai>=2.6.0",
     "scipy>=1.16.2",
     "uvicorn>=0.38.0",
-    "websockets>=15.0.1",
+    "websockets<14",
 ]
