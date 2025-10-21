@@ -17,6 +17,8 @@ const copyEnhancedButton = document.getElementById('copyEnhancedButton');
 const readabilityButton = document.getElementById('readabilityButton');
 const askAIButton = document.getElementById('askAIButton');
 const correctnessButton = document.getElementById('correctnessButton');
+const translateButton = document.getElementById('translateButton');
+const targetLanguageSelect = document.getElementById('targetLanguageSelect');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const saveApiKeyButton = document.getElementById('saveApiKeyButton');
 const settingsButton = document.getElementById('settingsButton');
@@ -48,6 +50,7 @@ let compatibleBaseUrl = null;
 let compatibleModel = null;
 let compatibleApiKey = null;
 let llmProvider = 'compatible'; // Default to compatible (for GLM)
+let targetLanguage = 'English'; // Default translation target language
 
 function openSettingsModal() {
     settingsModal.classList.add('active');
@@ -117,6 +120,13 @@ function loadApiKey() {
     if (savedProvider) {
         llmProvider = savedProvider;
         llmProviderSelect.value = savedProvider;
+    }
+
+    // Load target language preference
+    const savedLanguage = localStorage.getItem('target_language');
+    if (savedLanguage) {
+        targetLanguage = savedLanguage;
+        targetLanguageSelect.value = savedLanguage;
     }
 
     // Show/hide sections based on provider
@@ -463,6 +473,12 @@ document.addEventListener('DOMContentLoaded', () => {
     closeModal.onclick = closeSettingsModal;
     llmProviderSelect.onchange = saveLLMProvider;
 
+    // Target language change handler
+    targetLanguageSelect.onchange = () => {
+        targetLanguage = targetLanguageSelect.value;
+        localStorage.setItem('target_language', targetLanguage);
+    };
+
     // Close modal when clicking outside
     settingsModal.onclick = (e) => {
         if (e.target === settingsModal) {
@@ -658,6 +674,62 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
         console.error('Error:', error);
         alert('Error checking correctness');
+        stopTimer();
+    }
+    };
+
+    translateButton.onclick = async () => {
+    startTimer();
+    const inputText = transcript.value.trim();
+    if (!inputText) {
+        alert('Please enter text to translate.');
+        stopTimer();
+        return;
+    }
+
+    try {
+        const apiKey = getApiKey();
+        const requestBody = {
+            text: inputText,
+            target_language: targetLanguage,
+            llm_provider: llmProvider
+        };
+
+        if (llmProvider === 'openai') {
+            requestBody.api_key = apiKey;
+            requestBody.openai_model = openaiModel || 'gpt-4o';
+        } else {
+            requestBody.compatible_base_url = compatibleBaseUrl || '';
+            requestBody.compatible_model = compatibleModel || '';
+            requestBody.compatible_api_key = compatibleApiKey || '';
+        }
+
+        const response = await fetch('/api/v1/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) throw new Error('Translation failed');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            fullText += decoder.decode(value, { stream: true });
+            enhancedTranscript.value = fullText;
+            enhancedTranscript.scrollTop = enhancedTranscript.scrollHeight;
+        }
+
+        if (!isMobileDevice()) copyToClipboard(fullText, copyEnhancedButton);
+        stopTimer();
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error translating text');
         stopTimer();
     }
     };

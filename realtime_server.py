@@ -63,6 +63,19 @@ class AskAIRequest(BaseModel):
 class AskAIResponse(BaseModel):
     answer: str = Field(..., description="AI's answer to the question.")
 
+class TranslateRequest(BaseModel):
+    text: str = Field(..., description="The text to translate.")
+    target_language: str = Field(..., description="Target language for translation.")
+    api_key: str = Field(None, description="Optional OpenAI API key")
+    llm_provider: str = Field("compatible", description="LLM provider: 'openai' or 'compatible'")
+    openai_model: str = Field("gpt-4o", description="OpenAI model name")
+    compatible_base_url: str = Field(None, description="Optional compatible API base URL")
+    compatible_model: str = Field(None, description="Optional compatible model name")
+    compatible_api_key: str = Field(None, description="Optional compatible API key")
+
+class TranslateResponse(BaseModel):
+    translated_text: str = Field(..., description="The translated text.")
+
 app = FastAPI()
 
 # Make API key optional from environment variables
@@ -593,6 +606,47 @@ async def check_correctness(request: CorrectnessRequest):
     except Exception as e:
         logger.error(f"Error checking correctness: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error processing correctness check.")
+
+@app.post(
+    "/api/v1/translate",
+    response_model=TranslateResponse,
+    summary="Translate Text",
+    description="Translate and rephrase text to target language using GPT-4o."
+)
+async def translate_text(request: TranslateRequest):
+    prompt_template = PROMPTS.get('translate')
+    if not prompt_template:
+        raise HTTPException(status_code=500, detail="Translation prompt not found.")
+
+    # Format prompt with target language
+    prompt = prompt_template.format(target_language=request.target_language)
+
+    try:
+        # 根据用户选择使用 OpenAI 或 Compatible
+        if request.llm_provider == "compatible":
+            # Use OpenAI Compatible API (GLM, vLLM, Ollama, etc.)
+            processor = get_llm_processor(request.compatible_model or "GLM-4.6-FP8",
+                                         glm_host=request.compatible_base_url,
+                                         glm_api_key=request.compatible_api_key)
+            logger.info(f"Using compatible API with model {request.compatible_model} for translation")
+        else:
+            # Use OpenAI Official
+            api_key = request.api_key or OPENAI_API_KEY
+            if not api_key:
+                raise HTTPException(status_code=400, detail="OpenAI API key is required.")
+            model = request.openai_model or "gpt-4o"
+            processor = get_llm_processor(model, api_key=api_key)
+            logger.info(f"Using OpenAI {model} for translation")
+
+        async def text_generator():
+            async for part in processor.process_text(request.text, prompt):
+                yield part
+
+        return StreamingResponse(text_generator(), media_type="text/plain")
+
+    except Exception as e:
+        logger.error(f"Error translating text: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error processing translation.")
 
 if __name__ == '__main__':
     uvicorn.run(app, host="0.0.0.0", port=3005)

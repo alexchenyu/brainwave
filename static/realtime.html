@@ -3,7 +3,7 @@
 <head>
     <title>AI Voice Input</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" type="text/css" href="static/style.css?v=10">
+    <link rel="stylesheet" type="text/css" href="static/style.css?v=11">
 </head>
 <body>
     <div class="container">
@@ -20,6 +20,7 @@
             <button id="readabilityButton" class="action-button">Readability</button>
             <button id="correctnessButton" class="action-button">Correctness</button>
             <button id="askAIButton" class="action-button">Ask AI</button>
+            <button id="translateButton" class="action-button">Translate</button>
         </div>
         <div class="enhanced-transcript-container">
             <textarea id="enhancedTranscript"></textarea>
@@ -43,6 +44,23 @@
                     </select>
                     <div class="setting-hint">
                         Choose which model provider to use for text processing
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label for="targetLanguageSelect" class="setting-label">Translation Target Language</label>
+                    <select id="targetLanguageSelect" class="llm-provider-select">
+                        <option value="English">English</option>
+                        <option value="Chinese">中文 (Chinese)</option>
+                        <option value="Japanese">日本語 (Japanese)</option>
+                        <option value="Korean">한국어 (Korean)</option>
+                        <option value="Spanish">Español (Spanish)</option>
+                        <option value="French">Français (French)</option>
+                        <option value="German">Deutsch (German)</option>
+                        <option value="Russian">Русский (Russian)</option>
+                    </select>
+                    <div class="setting-hint">
+                        Language for the Translate button
                     </div>
                 </div>
 
@@ -87,6 +105,6 @@
         </div>
     </div>
 
-    <script src="static/main.js?v=10"></script>
+    <script src="static/main.js?v=11"></script>
 </body>
 </html>
