@@ -37,17 +37,6 @@
             </div>
             <div class="modal-body">
                 <div class="setting-item">
-                    <label for="llmProviderSelect" class="setting-label">LLM Provider for text processing</label>
-                    <select id="llmProviderSelect" class="llm-provider-select">
-                        <option value="openai">OpenAI (Official)</option>
-                        <option value="compatible">OpenAI Compatible (Custom)</option>
-                    </select>
-                    <div class="setting-hint">
-                        Choose which model provider to use for text processing
-                    </div>
-                </div>
-
-                <div class="setting-item">
                     <label for="targetLanguageSelect" class="setting-label">Translation Target Language</label>
                     <select id="targetLanguageSelect" class="llm-provider-select">
                         <option value="English">English</option>
@@ -61,6 +50,17 @@
                     </select>
                     <div class="setting-hint">
                         Language for the Translate button
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label for="llmProviderSelect" class="setting-label">LLM Provider for text processing</label>
+                    <select id="llmProviderSelect" class="llm-provider-select">
+                        <option value="openai">OpenAI (For Voice Input)</option>
+                        <option value="compatible">OpenAI Compatible (For Text Processing)</option>
+                    </select>
+                    <div class="setting-hint">
+                        Choose which model provider to use for text processing
                     </div>
                 </div>
 
@@ -86,10 +86,10 @@
 
                 <div class="setting-item" id="compatibleSettingsSection">
                     <label for="compatibleBaseUrlInput" class="setting-label">Base URL</label>
-                    <input type="text" id="compatibleBaseUrlInput" class="api-key-input" placeholder="https://api.365ui.com/v1" />
+                    <input type="text" id="compatibleBaseUrlInput" class="api-key-input"/>
 
                     <label for="compatibleModelInput" class="setting-label" style="margin-top: 15px;">Model Name</label>
-                    <input type="text" id="compatibleModelInput" class="api-key-input" placeholder="GLM-4.6-FP8" />
+                    <input type="text" id="compatibleModelInput" class="api-key-input"/>
 
                     <label for="compatibleApiKeyInput" class="setting-label" style="margin-top: 15px;">API Key</label>
                     <div class="api-key-input-group">
