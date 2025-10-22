@@ -178,8 +178,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 raise ValueError("No API key provided. Please set your OpenAI API key.")
 
             client = OpenAIRealtimeAudioTextClient(api_key)
-            await client.connect()
-            logger.info("Successfully connected to OpenAI client")
+            # Set system instructions for transcription-only behavior
+            system_instructions = PROMPTS['paraphrase-gpt-realtime']
+            await client.connect(instructions=system_instructions)
+            logger.info("Successfully connected to OpenAI client with system instructions")
             
             # Register handlers after client is initialized
             client.register_handler("session.updated", lambda data: handle_generic_event("session.updated", data))
@@ -376,7 +378,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                                 logger.info("All audio sent, committing audio buffer...")
                                 await client.commit_audio()
-                                await client.start_response(PROMPTS['paraphrase-gpt-realtime'])
+                                # Use session-level instructions (don't pass instructions here to avoid override)
+                                await client.start_response()
                                 await recording_stopped.wait()
                                 # Don't close the client here, let the disconnect timer handle it
                                 # Update client status to connected (waiting for response)

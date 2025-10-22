@@ -22,7 +22,7 @@ class OpenAIRealtimeAudioTextClient:
         self.handlers: Dict[str, Callable[[dict], asyncio.Future]] = {}
         self.queue = asyncio.Queue()
         
-    async def connect(self, modalities: List[str] = ["text"]):
+    async def connect(self, modalities: List[str] = ["text"], instructions: Optional[str] = None):
         """Connect to OpenAI's realtime API and configure the session"""
         self.ws = await websockets.connect(
             f"{self.base_url}?model={self.model}",
@@ -31,23 +31,30 @@ class OpenAIRealtimeAudioTextClient:
                 "OpenAI-Beta": "realtime=v1"
             }
         )
-        
+
         # Wait for session creation
         response = await self.ws.recv()
         response_data = json.loads(response)
         if response_data["type"] == "session.created":
             self.session_id = response_data["session"]["id"]
             logger.info(f"Session created with ID: {self.session_id}")
-            
+
             # Configure session
+            session_config = {
+                "modalities": modalities,
+                "input_audio_format": "pcm16",
+                "input_audio_transcription": None,
+                "turn_detection": None,
+            }
+
+            # Add instructions if provided (system prompt)
+            if instructions:
+                session_config["instructions"] = instructions
+                logger.info(f"Setting session instructions: {instructions[:100]}...")
+
             await self.ws.send(json.dumps({
                 "type": "session.update",
-                "session": {
-                    "modalities": modalities,
-                    "input_audio_format": "pcm16",
-                    "input_audio_transcription": None,
-                    "turn_detection": None,
-                }
+                "session": session_config
             }))
         
         # Register the default handler
@@ -107,17 +114,25 @@ class OpenAIRealtimeAudioTextClient:
         else:
             logger.error("WebSocket is not open. Cannot clear audio buffer.")
     
-    async def start_response(self, instructions: str):
-        """Start a new response with given instructions"""
+    async def start_response(self, instructions: Optional[str] = None):
+        """Start a new response with optional instructions.
+        If instructions not provided, uses session-level instructions."""
         if self.ws and self.ws.open:
+            response_config = {
+                "modalities": ["text"]
+            }
+            # Only include instructions if explicitly provided
+            # Otherwise, use session-level instructions
+            if instructions:
+                response_config["instructions"] = instructions
+                logger.info(f"Started response with instructions: {instructions[:100]}...")
+            else:
+                logger.info("Started response using session-level instructions")
+
             await self.ws.send(json.dumps({
                 "type": "response.create",
-                "response": {
-                    "modalities": ["text"],
-                    "instructions": instructions
-                }
+                "response": response_config
             }))
-            logger.info(f"Started response with instructions: {instructions}")
         else:
             logger.error("WebSocket is not open. Cannot start response.")
     
